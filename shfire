@@ -1,0 +1,28 @@
+#!/bin/sh
+authF="${XDG_CACHE_HOME:-$HOME/.cache/}/shfire/authkey"
+auth() {
+  [ -f "$authF" ] && { . "$authF"; } || { death "AUTHKEYS FILE MISSING, PLEASE ADD IT TO $authF"; }
+}
+send() {
+  postemp=$(mktemp); cat > $postemp
+  IFS=""
+  curl -sX "POST" -H "Authorization: NTgzNDc5MDUxNTI0NTA1NjMw.YHn2Mg.JRofwLPASYxbIDYK7jHwG8DzpKw" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/channels/$1/messages" -d content="$(cat $postemp)" >/dev/null
+  rm $postemp
+}
+readCH() {
+   curl -sX "GET" -H "Authorization: NTgzNDc5MDUxNTI0NTA1NjMw.YHn2Mg.JRofwLPASYxbIDYK7jHwG8DzpKw" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/channels/$1/messages" | jq '.[] | [.author.username,.content]' -r | sed -e 's/"//g' -e 's/,/:/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' | tr -s ' '
+}
+auth
+case $(basename $0) in
+  shfire)
+    usage; exit 1
+  ;;
+  send)
+    echo "Sending..."
+    send "$1";
+  ;;
+  read)
+    echo "Reading..."
+    readCH "$1"
+  ;;  
+esac
