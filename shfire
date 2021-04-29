@@ -1,28 +1,95 @@
-#!/bin/sh
+#!/bin/sh 
+# shellcheck disable=SC2015,SC1090
 authF="${XDG_CACHE_HOME:-$HOME/.cache/}/shfire/authkey"
+authB="${XDG_CACHE_HOME:-$HOME/.cache/}/basefire/authkey" # basefire
+death() { echo $1; exit 1; }
 auth() {
-  [ -f "$authF" ] && { . "$authF"; } || { death "AUTHKEYS FILE MISSING, PLEASE ADD IT TO $authF"; }
+  [ -f "$authF" ] && { . "$authF"; } || {
+    [ -f "./authkey" ] && { . "./authkey"; } || {
+      [ -f "$authB" ] && { . "$authB"; }
+    }
+  }
+  [ "$AUTHKEY" ] || { death "AUTHKEY UNSET OR AUTHFILE MISSING... CANNOT CONTINUE.."; }
 }
+
+#
+# ~'s Are used as delimiters, from that reason whenever a delimiter is needed
+# regex will replace ~'s for -'s before using delimiters
+# This will have no effect on ID's and the client should continue to work fine
+# since * names are only displayed and never read
+#
+
 send() {
   postemp=$(mktemp); cat > $postemp
   IFS=""
-  curl -sX "POST" -H "Authorization: NTgzNDc5MDUxNTI0NTA1NjMw.YHn2Mg.JRofwLPASYxbIDYK7jHwG8DzpKw" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/channels/$1/messages" -d content="$(cat $postemp)" >/dev/null
+  [ "$1" ] || { death "Channel ID not given... FALLING BACK..." ; }
+  [ ! "$(wc -m < $postemp)" -gt "2000" ] || { death "MESSAGE LONGER THEN 2000 CHARS... FALLING BACK"; } # Handle made lenght
+  curl -sX "POST" -H "Authorization: $AUTHKEY" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/channels/$1/messages" -d content="$(cat $postemp)" >/dev/null
   rm $postemp
 }
 readCH() {
-   curl -sX "GET" -H "Authorization: NTgzNDc5MDUxNTI0NTA1NjMw.YHn2Mg.JRofwLPASYxbIDYK7jHwG8DzpKw" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/channels/$1/messages" | jq '.[] | [.author.username,.content]' -r | sed -e 's/"//g' -e 's/,/:/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' | tr -s ' '
+  [ "$1" ] || { death "Channel ID not given... FALLING BACK..." ; }
+  curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/channels/$1/messages" | jq '.[] | [.author.username,.content]' -r | sed -e 's/"//g' -e 's/,/:/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//'
 }
-auth
+listG() {
+  #ui="$(echo -ne $'\355')"
+  curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/users/@me/guilds" | jq '.[] | [.name,.id]' -r | sed -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
+}
+listCH() {
+  [ $1 ] || { death "Guild ID not given... FALLING BACK..."; }
+  curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/guilds/$1/channels" | jq '.[] | [.name,.id]' | sed -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
+}
+listDM() {
+  curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/users/@me/channels" | jq '.[] | [ if .type != 3 then .recipients[].username,.id else "TYPE 3" end]' | sed -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' -e '/TYPE 3/d' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
+  # TYPE 3 # Group DMs are not supported and will not be...
+  # this regex just discrads them, since it would take extra sed + tr to manage them
+}
+usage() {
+  cat << 'EOF'
+###
+SHfire:
+  Extremely basic Discord Client in POSIX sh
+    - Because, Because? I'm insane?
+Usage:
+  <command outputing text> | ./send <CHANNEL ID>
+    - Sends piped data to <CHANNEL ID>
+  ./read <CHANNEL ID>
+    - Outputs messages in CHANNEL
+      - Extremely basic...
+  ./list [DM|CH]
+    - Lists Guilds/Channels/DMs
+    CH:
+      - Requires <GUILD ID>
+###
+EOF
+}
 case $(basename $0) in
   shfire)
     usage; exit 1
   ;;
   send)
+    auth
     echo "Sending..."
     send "$1";
   ;;
   read)
+    auth
     echo "Reading..."
     readCH "$1"
-  ;;  
+  ;;
+  list)
+    auth
+    [ "$1" = "CH" ] && {
+      echo "Getting Channels.."
+      listCH "$2"
+      exit 0
+    }
+    [ "$1" = "DM" ] && {
+      echo "Getting DMs..."
+      listDM
+      exit 0
+    }
+    echo "Getting Guilds..." 
+    listG
+  ;;
 esac
