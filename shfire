@@ -29,7 +29,8 @@ send() {
 }
 readCH() {
   [ "$1" ] || { death "Channel ID not given... FALLING BACK..." ; }
-  curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/channels/$1/messages" | jq '.[] | [.author.username,.content]' -r | sed -e 's/"//g' -e 's/,/:/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//'
+  echo -e $(curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/channels/$1/messages" | jq '.[] | [.author.username,.content]' -r | sed -e 's/~/-/g' -e 's/"//g' -e 's/,/:~/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//') | sed 's/-e //' | tr '~' '\n' | sed 's/^[ \t]*//'
+  # echo -e is used to fix, escapes...
 }
 listG() {
   #ui="$(echo -ne $'\355')"
@@ -74,7 +75,8 @@ case $(basename $0) in
   ;;
   read)
     auth
-    echo "Reading..."
+    #echo "Reading..."
+    # Better to not have this for basefire...
     readCH "$1"
   ;;
   list)
