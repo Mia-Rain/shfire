@@ -38,7 +38,8 @@ listG() {
 }
 listCH() {
   [ $1 ] || { death "Guild ID not given... FALLING BACK..."; }
-  curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/guilds/$1/channels" | jq '.[] | [.name,.id]' | sed -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
+  curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/guilds/$1/channels" | jq '.[] | [ if .type == 0 then .name,.id else "GROUPoVC" end ]' | sed -e '/GROUPoVC/d' -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
+  # != type 0 means a group or vc which are useless to shfire and only annoying
 }
 listDM() {
   curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/users/@me/channels" | jq '.[] | [ if .type != 3 then .recipients[].username,.id else "TYPE 3" end]' | sed -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' -e '/TYPE 3/d' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
