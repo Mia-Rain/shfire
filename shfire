@@ -4,8 +4,8 @@ authF="${XDG_CACHE_HOME:-$HOME/.cache/}/shfire/authkey"
 authB="${XDG_CACHE_HOME:-$HOME/.cache/}/basefire/authkey" # basefire
 death() { echo $1; exit 1; }
 auth() {
-  [ -f "$authF" ] && { . "$authF"; } || {
-    [ -f "./authkey" ] && { . "./authkey"; } || {
+  [ -f "./authkey" ] && { . "./authkey"; } || {
+    [ -f "$authF" ] && { . "$authF"; } || {
       [ -f "$authB" ] && { . "$authB"; }
     }
   }
