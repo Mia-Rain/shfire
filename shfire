@@ -30,8 +30,8 @@ send() {
 readCH() {
   [ "$1" ] || { death "Channel ID not given... FALLING BACK..." ; }
   echo $(curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0" -L "https://discord.com/api/v6/channels/$1/messages" | {
-   [ "$2" ] || { jq '.[] | ["\n"+.author.username+": ",.content]' -r; } &&  { jq '.[] | ["\n"+.author.id+": ",.content]' -r; }
- } | sed -e 's/"//g' -e 's/,//g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//') | sed -e 's/^[ \t]*//'
+   [ "$2" ] || { jq '.[] | ["\n"+.author.username+": ",.content]' -r; } &&  { jq '.[] | ["\n"+.author.id+"035 ",.content]' -r; }
+ } | sed -e 's/"//g' -e 's/,//g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' ) | sed -e 's/^[ \t]*//'
   # echo -e is used to fix, escapes...
 }
 listG() {
