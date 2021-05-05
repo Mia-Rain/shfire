@@ -29,10 +29,17 @@ send() {
 }
 readCH() {
   [ "$1" ] || { death "Channel ID not given... FALLING BACK..." ; }
-  echo $(curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: $UA" -L "https://discord.com/api/v6/channels/$1/messages" | {
-   [ "$2" ] || { jq '.[] | ["\n"+.author.username+": ",.content]' -r; } &&  { jq '.[] | ["\n"+.author.id+"DIL ",.content]' -r; }
- } | sed -e 's/"//g' -e 's/,//' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' ) | sed -e 's/^[ \t]*//'
-  # echo -e is used to fix, escapes...
+  rtemp=$(mktemp)
+  code=$(curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: $UA" -L "https://discord.com/api/v6/channels/$1/messages" -w '%{http_code}' --output $rtemp)
+  while [ "$code" -gt 300 ]; do
+    sleep ".$(jq .retry_after $rtemp)"
+    code=$(curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: $UA" -L "https://discord.com/api/v6/channels/$1/messages" --output $rtemp -w '%{http_code}')
+  done
+  echo $(cat $rtemp | {
+    [ "$2" ] || { jq '.[] | ["\n"+.author.username+": ",.content]' -r; } &&  { jq '.[] | ["\n"+.author.id+"DIL ",.content]' -r; } 
+  } | sed -e 's/"//g' -e 's/,//' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//') | sed -e 's/^[ \t]*//'
+  # echo -e is needed when using bash
+  rm $rtemp
 }
 listG() {
   #ui="$(echo -ne $'\355')"
