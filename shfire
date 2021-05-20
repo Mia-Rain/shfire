@@ -2,6 +2,11 @@
 # shellcheck disable=SC2015,SC1090
 authF="${XDG_CACHE_HOME:-$HOME/.cache/}/shfire/authkey"
 authB="${XDG_CACHE_HOME:-$HOME/.cache/}/basefire/authkey" # basefire
+## This should be a simple case that adds `=e` to echo if bash is used
+[ $BASH ] && {
+  export e='-e'
+}
+##
 death() { echo $1; exit 1; }
 auth() {
   [ -f "./authkey" ] && { . "./authkey"; } || {
@@ -32,10 +37,11 @@ readCH() {
   rtemp=$(mktemp)
   code=$(curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: $UA" -L "https://discord.com/api/v6/channels/$1/messages" -w '%{http_code}' --output $rtemp)
   while [ "$code" -gt 300 ]; do
-    sleep ".$(jq .retry_after $rtemp)"
+    num=$(jq .retry_after $rtemp); num=${num%[0-9][0-9][0-9]}
+    sleep ".$num"
     code=$(curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: $UA" -L "https://discord.com/api/v6/channels/$1/messages" --output $rtemp -w '%{http_code}')
   done
-  echo $(cat $rtemp | {
+  echo ${e} $(cat $rtemp | {
     [ "$2" ] || { jq '.[] | ["\n"+.author.username+": ",.content]' -r; } &&  { jq '.[] | ["\n"+.author.id+"DIL ",.content]' -r; } 
   } | sed -e 's/"//g' -e 's/,//' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//') | sed -e 's/^[ \t]*//'
   # echo -e is needed when using bash
