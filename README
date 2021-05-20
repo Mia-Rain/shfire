@@ -1,0 +1,16 @@
+-------------------
+SHfire: Extremely basic Discord client using HTTP polling without a gateway
+-------------------
+# Setup:
+  From Discord (Web/PC client):
+  -----------------------------
+  1. hit ctrl+shift+i
+  2. switch to the network tab
+  3. find discord API requests. This is usually called messages, ack, typing, etc...
+  4. search for the authorization header. This is the token.
+  5. once you have the token
+  6. create the file ${XDG_CACHE_HOME:-$HOME/.cache/}/shfire/authkey
+  7. with AUTHKEY= and then your token
+    IE: AUTHKEY=XXXxXXXXXXX.xXXXXXXXX.XXXXXXXXXXXXXXXXXxxXxX
+  8. Run ./shfire for usage
+-------------------

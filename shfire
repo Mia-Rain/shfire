@@ -62,6 +62,9 @@ listDM() {
   # this regex just discrads them, since it would take extra sed + tr to manage them
 }
 usage() {
+  [ $BASH ] && {
+    printf "SHfire works better with a POSIX shell linked to /bin/sh...\n\n"
+  }
   cat << 'EOF'
 ###
 SHfire:
@@ -94,13 +97,13 @@ case $(basename $0) in
     # Better to not have this for basefire...
     readCH "$@"
   ;;
-  list)
-    [ "$1" = "CH" ] && {
+  list|CH|DM)
+    [ "$1" = "CH" -o "$(basename $0)" = "CH" ] && {
       echo "Getting Channels.."
       listCH "$2"
       exit 0
     }
-    [ "$1" = "DM" ] && {
+    [ "$1" = "DM" -o "$(basename $0)" = "DM" ] && {
       echo "Getting DMs..."
       listDM
       exit 0
