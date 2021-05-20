@@ -2,12 +2,12 @@
 # shellcheck disable=SC2015,SC1090
 authF="${XDG_CACHE_HOME:-$HOME/.cache/}/shfire/authkey"
 authB="${XDG_CACHE_HOME:-$HOME/.cache/}/basefire/authkey" # basefire
-## This should be a simple case that adds `=e` to echo if bash is used
+## This should be a simple case that adds `-e` to echo if bash is used
 [ $BASH ] && {
   export e='-e'
 }
 ##
-death() { echo $1; exit 1; }
+death() { rm $rtemp 2>/dev/null; echo $1; exit 1; } # Clean up on death
 auth() {
   [ -f "./authkey" ] && { . "./authkey"; } || {
     [ -f "$authF" ] && { . "$authF"; } || {
@@ -24,40 +24,52 @@ auth() {
 # since * names are only displayed and never read
 #
 
+### Ratelimit handler func
+Rlimit() {
+  rtemp=$(mktemp)
+  [ ! $5 ] && { 
+    code=$(${1} -H "$2" -H "$3" -L "$4" -w '%{http_code}' --output $rtemp)
+  }
+  while [ "$code" -gt 300 ]; do
+    num=$(jq .retry_after $rtemp); num=${num%[0-9][0-9][0-9]}
+    sleep ".$num"
+    [ ! $5 ] && {
+      code=$(${1} -H "$2" -H "$3" -L "$4" -w '%{http_code}' --output $rtemp)
+    }
+  done
+}
+
+###
 send() {
   postemp=$(mktemp); cat > $postemp
   IFS=""
   [ "$1" ] || { death "Channel ID not given... FALLING BACK..." ; }
-  [ ! "$(wc -m < $postemp)" -gt "2000" ] || { death "MESSAGE LONGER THEN 2000 CHARS... FALLING BACK"; } # Handle made lenght
+  [ ! "$(wc -m < $postemp)" -gt "2000" ] || { death "MESSAGE LONGER THEN 2000 CHARS... FALLING BACK"; } # Handle max lenght
   curl -sX "POST" -H "Authorization: $AUTHKEY" -H "User-Agent: $UA" -L "https://discord.com/api/v6/channels/$1/messages" -d content="$(cat $postemp)" >/dev/null
   rm $postemp
 }
 readCH() {
   [ "$1" ] || { death "Channel ID not given... FALLING BACK..." ; }
-  rtemp=$(mktemp)
-  code=$(curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: $UA" -L "https://discord.com/api/v6/channels/$1/messages" -w '%{http_code}' --output $rtemp)
-  while [ "$code" -gt 300 ]; do
-    num=$(jq .retry_after $rtemp); num=${num%[0-9][0-9][0-9]}
-    sleep ".$num"
-    code=$(curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: $UA" -L "https://discord.com/api/v6/channels/$1/messages" --output $rtemp -w '%{http_code}')
-  done
+  Rlimit "curl -sX GET" "Authorization: $AUTHKEY" "User-Agent: $UA" "https://discord.com/api/v6/channels/$1/messages"
   echo ${e} $(cat $rtemp | {
     [ "$2" ] || { jq '.[] | ["\n"+.author.username+": ",.content]' -r; } &&  { jq '.[] | ["\n"+.author.id+"DIL ",.content]' -r; } 
   } | sed -e 's/"//g' -e 's/,//' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//') | sed -e 's/^[ \t]*//'
   # echo -e is needed when using bash
-  rm $rtemp
 }
 listG() {
   #ui="$(echo -ne $'\355')"
-  curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: $UA" -L "https://discord.com/api/v6/users/@me/guilds" | jq '.[] | [.name,.id]' -r | sed -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
+  Rlimit "curl -sX GET" "Authorization: $AUTHKEY" "User-Agent: $UA" "https://discord.com/api/v6/users/@me/guilds"
+  jq '.[] | [.name,.id]' -r $rtemp | sed -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
 }
 listCH() {
   [ $1 ] || { death "Guild ID not given... FALLING BACK..."; }
-  curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: $UA" -L "https://discord.com/api/v6/guilds/$1/channels" | jq '.[] | [ if .type == 0 then .name,.id else "GROUPoVC" end ]' | sed -e '/GROUPoVC/d' -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
+  Rlimit "curl -sX GET" "Authorization: $AUTHKEY" "User-Agent: $UA" "https://discord.com/api/v6/guilds/$1/channels" 
+  jq '.[] | [ if .type == 0 then .name,.id else "GROUPoVC" end ]' $rtemp | sed -e '/GROUPoVC/d' -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
   # != type 0 means a group or vc which are useless to shfire and only annoying
 }
 listDM() {
-  curl -sX "GET" -H "Authorization: $AUTHKEY" -H "User-Agent: $UA" -L "https://discord.com/api/v6/users/@me/channels" | jq '.[] | [ if .type != 3 then .recipients[].username,.id else "TYPE 3" end]' | sed -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' -e '/TYPE 3/d' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
+  Rlimit "curl -sX GET" "Authorization: $AUTHKEY" "User-Agent: $UA" "https://discord.com/api/v6/users/@me/channels"
+  jq '.[] | [ if .type != 3 then .recipients[].username,.id else "TYPE 3" end]' $rtemp | sed -e 's/~/-/g' -e 's/"//g' -e 's/,/@/g' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//' -e '/TYPE 3/d' | tr '\n' "~" | sed -e "s/@~/@/g" | tr '~' '\n'
   # TYPE 3 # Group DMs are not supported and will not be...
   # this regex just discrads them, since it would take extra sed + tr to manage them
 }
@@ -100,7 +112,7 @@ case $(basename $0) in
   list|CH|DM)
     [ "$1" = "CH" -o "$(basename $0)" = "CH" ] && {
       echo "Getting Channels.."
-      listCH "$2"
+      listCH "${2:-$1}"
       exit 0
     }
     [ "$1" = "DM" -o "$(basename $0)" = "DM" ] && {
@@ -111,4 +123,4 @@ case $(basename $0) in
     echo "Getting Guilds..." 
     listG
   ;;
-esac
+esac; [ $rtemp ] 2>/dev/null && { rm $rtemp; } 
