@@ -2,11 +2,22 @@
 # shellcheck disable=SC2015,SC1090
 authF="${XDG_CACHE_HOME:-$HOME/.cache/}/shfire/authkey"
 authB="${XDG_CACHE_HOME:-$HOME/.cache/}/basefire/authkey" # basefire
-## This should be a simple case that adds `-e` to echo if bash is used
-[ $BASH ] && {
-  export e='-e'
-}
+
+## readCH needs echo, printf doesn't work with it, unless I mess with it
+## so the following hack should work for any shell supporting -e
+## that isn't a unix shell I can't make a case for
+  
+case "$(echo -e '\n')" in
+  *-e*)
+    unset e;;
+  *)
+    e="-e";;
+esac
+
 ##
+##
+##
+
 death() { rm $rtemp 2>/dev/null; echo $1; exit 1; } # Clean up on death
 auth() {
   [ -f "./authkey" ] && { . "./authkey"; } || {
@@ -51,9 +62,9 @@ send() {
 readCH() {
   [ "$1" ] || { death "Channel ID not given... FALLING BACK..." ; }
   Rlimit "curl -sX GET" "Authorization: $AUTHKEY" "User-Agent: $UA" "https://discord.com/api/v6/channels/$1/messages"
-  echo ${e} $(cat $rtemp | {
-    [ "$2" ] || { jq '.[] | ["\n"+.author.username+": ",.content]' -r; } &&  { jq '.[] | ["\n"+.author.id+"DIL ",.content]' -r; } 
-  } | sed -E -e 's/"//g' -e 's/,//' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//') | sed -E -e 's/^[ \t]*//'
+  echo ${e} "$(cat $rtemp | {
+    [ "$2" ] || { jq '.[] | [.author.username+": ",.content]' -r; } &&  { jq '.[] | [.author.id+"DIL ",.content]' -r; } 
+  } | sed -E -e 's/"//g' -e 's/,//' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//')" | sed -E -e 's/^[ \t]*//'
   # echo -e is needed when using bash
 }
 listG() {
