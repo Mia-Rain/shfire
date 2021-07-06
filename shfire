@@ -62,9 +62,9 @@ send() {
 readCH() {
   [ "$1" ] || { death "Channel ID not given... FALLING BACK..." ; }
   Rlimit "curl -sX GET" "Authorization: $AUTHKEY" "User-Agent: $UA" "https://discord.com/api/v6/channels/$1/messages"
-  echo ${e} "$(cat $rtemp | {
-    [ "$2" ] || { jq '.[] | [.author.username+": ",.content]' -r; } &&  { jq '.[] | [.author.id+"DIL ",.content]' -r; } 
-  } | sed -E -e 's/"//g' -e 's/,//' -e 's/\[//g' -e 's/\]//g' -e '/^$/d' -e 's/^[ \t]*//')" | sed -E -e 's/^[ \t]*//'
+  IFS=""; echo ${e} $(cat $rtemp | {
+    [ "$2" ] || { jq '.[] | .author.username+": ",.content' -r; } &&  { jq '.[] | .author.id+"DIL",.content' -r; } 
+  }| sed -e '/^$/d' -e 's/~/-/g' ) | tr '\n' '~' | sed -e 's/DIL~/DIL /g' -e 's/~/\n/g' 
   # echo -e is needed when using bash
 }
 listG() {
