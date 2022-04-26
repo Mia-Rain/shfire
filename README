@@ -1,4 +1,9 @@
 -------------------
+Status: 
+  This no longer works ...
+  I beliieve this is beause the api version has changed
+  I have no plans to fix this as I don't use Discord anymore
+-------------------
 SHfire: Extremely basic Discord client using HTTP polling without a gateway
 -------------------
 # Setup:
